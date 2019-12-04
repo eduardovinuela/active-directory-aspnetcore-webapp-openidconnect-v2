@@ -4,28 +4,30 @@ platforms: dotnet
 author: jmprieur
 level: 100
 client: ASP.NET Core Web App
-endpoint: AAD v2.0
+endpoint: Microsoft identity platform
 ---
+
+
 # An ASP.NET Core Web app signing-in users in any org with the Microsoft identity platform
 
 > This sample is for Azure AD, not Azure AD B2C. See [active-directory-b2c-dotnetcore-webapp](https://github.com/Azure-Samples/active-directory-b2c-dotnetcore-webapp), until we incorporate the B2C variation in the tutorial.
 
-![Build badge](https://identitydivision.visualstudio.com/_apis/public/build/definitions/a7934fdd-dcde-4492-a406-7fad6ac00e17/514/badge)
+[![Build status](https://identitydivision.visualstudio.com/IDDP/_apis/build/status/AAD%20Samples/.NET%20client%20samples/ASP.NET%20Core%20Web%20App%20tutorial)](https://identitydivision.visualstudio.com/IDDP/_build/latest?definitionId=819)
 
 ## Scenario
 
-This sample shows how to build a .NET Core 2.2 MVC Web app that uses OpenID Connect to sign in users. Users can a work and school accounts from any company or organization that has integrated with Azure Active Directory. It leverages the ASP.NET Core OpenID Connect middleware.
+This sample shows how to build a .NET Core MVC Web app that uses OpenID Connect to sign in users. Users can a work and school accounts from any company or organization that has integrated with Azure Active Directory. It leverages the ASP.NET Core OpenID Connect middleware.
 
 ![Sign in with Azure AD](ReadmeFiles/sign-in.png)
 
 > This is the second chapter of the first phase of this ASP.NET Core Web App tutorial. Once you understand how to sign-in users in an ASP.NET Core Web App with Open Id Connect, can learn how to enable your [Web App to call a Web API on behalf of the signed-in user](../../2-WebApp-graph-user) in a later chapter.
->  You can also sign-in users in your own Azure Active Directory organizations, and even with Microsoft personal accounts or social identities. For more details the parent directory's [Readme.md](../Readme.md)
+>  You can also sign-in users in your own Azure Active Directory organizations, and even with Microsoft personal accounts or social identities. For more details the parent directory's [Readme.md](../README.md)
 
 ## How to run this sample
 
 To run this sample:
 
-> Pre-requisites: Install .NET Core 2.2 or later (for example for Windows) by following the instructions at [.NET and C# - Get Started in 10 Minutes](https://www.microsoft.com/net/core). In addition to developing on Windows, you can develop on [Linux](https://www.microsoft.com/net/core#linuxredhat), [Mac](https://www.microsoft.com/net/core#macos), or [Docker](https://www.microsoft.com/net/core#dockercmd).
+> Pre-requisites: Install .NET Core 3.0 or later (for example for Windows) by following the instructions at [.NET and C# - Get Started in 10 Minutes](https://www.microsoft.com/net/core). In addition to developing on Windows, you can develop on [Linux](https://www.microsoft.com/net/core#linuxredhat), [Mac](https://www.microsoft.com/net/core#macos), or [Docker](https://www.microsoft.com/net/core#dockercmd).
 
 ### Step 1: Register the sample with your Azure AD tenant
 
@@ -40,7 +42,7 @@ There is one project in this sample. To register it, you can:
      Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
      ```
 
-  3. Run the script to create your Azure AD application and configure the code of the sample application accordinly
+  3. Run the script to create your Azure AD application and configure the code of the sample application accordingly
 
      ```PowerShell
      .\AppCreationScripts\Configure.ps1
@@ -67,7 +69,7 @@ As a first step you'll need to:
 1. When the **Register an application page** appears, enter your application's registration information:
    - In the **Name** section, enter a meaningful application name that will be displayed to users of the app, for example `WebApp`.
    - In the **Supported account types** section, select **Accounts in any organizational directory**.
-     > Note that there are more than one redirect URIs. You'll need to add them from the **Authentication** tab later after the app has been created succesfully.
+     > Note that there are more than one redirect URIs. You'll need to add them from the **Authentication** tab later after the app has been created successfully.
 1. Select **Register** to create the application.
 1. On the app **Overview** page, find the **Application (client) ID** value and record it for later. You'll need it to configure the Visual Studio configuration file for this project.
 1. In the list of pages for the app, select **Authentication**..
@@ -84,7 +86,7 @@ As a first step you'll need to:
 
 ### Step 2: Download/ Clone this sample code or build the application using a template
 
-This sample was created from the dotnet core 2.2 [dotnet new mvc](https://docs.microsoft.com/dotnet/core/tools/dotnet-new?tabs=netcore2x) template with `SingleOrg` authentication, and then tweaked to let it support tokens for the Azure AD V2 endpoint. You can clone/download this repository or create the sample from the command line:
+This sample was created from the dotnet core 2.2 [dotnet new mvc](https://docs.microsoft.com/dotnet/core/tools/dotnet-new?tabs=netcore2x) template with `SingleOrg` authentication, and then tweaked to let it support tokens for the Microsoft identity platform endpoint. You can clone/download this repository or create the sample from the command line:
 
 #### Option 1: Download/ clone this sample
 
@@ -134,10 +136,10 @@ cd "1-WebApp-OIDC\1-2-AnyOrg"
      by this line:
 
      ```CSharp
-      services.AddAzureAdV2Authentication(Configuration);
+      services.AddMicrosoftIdentityPlatformAuthentication(Configuration);
      ```
 
-     This enables your application to use the Microsoft identity platform (formerly Azure AD v2.0) endpoint. This endpoint is capable of signing-in users both with their Work and School and Microsoft Personal accounts.
+     This enables your application to use the Microsoft identity platform endpoint. This endpoint is capable of signing-in users both with their Work and School and Microsoft Personal accounts.
 
     1. Change the `Properties\launchSettings.json` file to ensure that you start your web app from <https://localhost:44321> as registered. For this:
     - update the `sslPort` of the `iisSettings` section to be `44321`
@@ -147,8 +149,7 @@ cd "1-WebApp-OIDC\1-2-AnyOrg"
 
 1. Build the solution and run it.
 
-2. Open your web browser and make a request to the app. Accept the IIS Express SSL certificate if needed. The app immediately attempts to authenticate you via the Azure AD v2 endpoint. Sign in with your personal account or with work or school account.
-
+2. Open your web browser and make a request to the app. Accept the IIS Express SSL certificate if needed. The app immediately attempts to authenticate you via the Microsoft identity platform endpoint. Sign in with your personal account or with work or school account.
 
 ## Toubleshooting
 

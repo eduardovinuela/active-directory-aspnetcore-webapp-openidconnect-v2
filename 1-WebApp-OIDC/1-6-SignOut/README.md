@@ -1,13 +1,15 @@
 # Signing out
 
+[![Build status](https://identitydivision.visualstudio.com/IDDP/_apis/build/status/AAD%20Samples/.NET%20client%20samples/ASP.NET%20Core%20Web%20App%20tutorial)](https://identitydivision.visualstudio.com/IDDP/_build/latest?definitionId=819)
+
 This page explains how sign-out works
 
 ## What sign out involves
 
 Signing out from a Web app is about more than removing the information about the signed-in account from the Web App's state.
-The Web app must also redirect the user to the Microsoft identity platform v2.0 `logout` endpoint to sign out. When your web app redirects the user to the `logout` endpoint, this endpoint clears the user's session from the browser. If your app did not go to the `logout` endpoint, the user would reauthenticate to your app without entering their credentials again, because they would have a valid single sign-in session with the Microsoft Identity platform v2.0 endpoint.
+The Web app must also redirect the user to the Microsoft identity platform `logout` endpoint to sign out. When your web app redirects the user to the `logout` endpoint, this endpoint clears the user's session from the browser. If your app did not go to the `logout` endpoint, the user would reauthenticate to your app without entering their credentials again, because they would have a valid single sign-in session with the Microsoft identity platform endpoint.
 
-To learn more, see the [Send a sign-out request](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-protocols-oidc#send-a-sign-out-request) paragraph in the [Microsoft Identity platform v2.0 and the OpenID Connect protocol](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-protocols-oidc) conceptual documentation
+To learn more, see the [Send a sign-out request](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-protocols-oidc#send-a-sign-out-request) paragraph in the [Microsoft identity platform and the OpenID Connect protocol](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-protocols-oidc) conceptual documentation
 
 ## Application registration
 
@@ -51,35 +53,27 @@ from <https://github.com/aspnet/AspNetCore/blob/master/src/Azure/AzureAD/Authent
 
 ### Intercepting the call to the logout endpoint
 
-The ASP.NET Core OpenIdConnect middleware enables your app to intercept the call to the Microsoft identity platform logout endpoint by providing an OpenIdConnect event named `OnRedirectToIdentityProviderForSignOut`. The web app uses it to attempt to avoid the select account dialog to be presented to the user when signing out. This interception is done in the `AddAzureAdV2Authentication` of the `Microsoft.Identity.Web` reusable library. See [StartupHelpers.cs L58-L66](https://github.com/Azure-Samples/active-directory-aspnetcore-webapp-openidconnect-v2/blob/b87a1d859ff9f9a4a98eb7b701e6a1128d802ec5/Microsoft.Identity.Web/StartupHelpers.cs#L58-L66)
+The ASP.NET Core OpenIdConnect middleware enables your app to intercept the call to the Microsoft identity platform logout endpoint by providing an OpenIdConnect event named `OnRedirectToIdentityProviderForSignOut`.
 
 ```CSharp
-public static IServiceCollection AddAzureAdV2Authentication(this IServiceCollection services,
+public static IServiceCollection AddMicrosoftIdentityPlatformAuthentication(this IServiceCollection services,
                                                             IConfiguration configuration)
 {
-    ...
     services.Configure<OpenIdConnectOptions>(AzureADDefaults.OpenIdScheme, options =>
     {
-        ...
         options.Authority = options.Authority + "/v2.0/";
-        ...
-        // Attempt to avoid displaying the select account dialog when signing out
+        
         options.Events.OnRedirectToIdentityProviderForSignOut = async context =>
         {
-            var user = context.HttpContext.User;
-            context.ProtocolMessage.LoginHint = user.GetLoginHint();
-            context.ProtocolMessage.DomainHint = user.GetDomainHint();
-            await Task.FromResult(0);
+            //Your logic here
         };
     }
 }
 ```
 
-### Intercepting the callback after logout - Single Sign Out
+### Clearing the token cache
 
-Your application can also intercept the after logout event, for instance to clear the entry of the token cache associated with the account that signed out. We'll see in the second part of this tutorial (about the Web app calling a Web API), that the web app will store access tokens for the user in a cache. Intercepting the after logout callback enables your web application to remove the user from the token cache. This is illustrated in the `AddMsal()` method of [StartupHelper.cs L137-143](https://github.com/Azure-Samples/active-directory-aspnetcore-webapp-openidconnect-v2/blob/b87a1d859ff9f9a4a98eb7b701e6a1128d802ec5/Microsoft.Identity.Web/StartupHelpers.cs#L137-L143)
-
-The Logout Url that you have registered for your application enables you to implement single sign out. Indeed, the Microsoft identity platform logout endpoint will call the Logout URL registered with your application. This call happens whether or not the sign-out was initiated from your web app, or from another web app or the browser. For more information, see [Single sign-out](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-protocols-oidc#single-sign-out) in the conceptual documentation
+Your application can also intercept the logout event, for instance to clear the entry of the token cache associated with the account that signed out. We'll see in the second part of this tutorial (about the Web app calling a Web API), that the web app will store access tokens for the user in a cache. Intercepting the logout callback enables your web application to remove the user from the token cache. This is illustrated in the `AddMsal()` method of [StartupHelper.cs L137-143](https://github.com/Azure-Samples/active-directory-aspnetcore-webapp-openidconnect-v2/blob/b87a1d859ff9f9a4a98eb7b701e6a1128d802ec5/Microsoft.Identity.Web/StartupHelpers.cs#L137-L143)
 
 ```CSharp
 public static IServiceCollection AddMsal(this IServiceCollection services, IEnumerable<string> initialScopes)
@@ -99,4 +93,17 @@ public static IServiceCollection AddMsal(this IServiceCollection services, IEnum
     });
     return services;
 }
+```
+
+### Single Sign-Out
+
+The **Logout Url** that you have registered for your application enables you to implement single sign-out. Indeed, the Microsoft identity platform logout endpoint will call the **Logout Url** registered with your application. This call happens whether or not the sign-out was initiated from your web app, or from another web app or the browser. For more information, see [Single sign-out](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-protocols-oidc#single-sign-out) in the conceptual documentation.
+
+In our tutorial, you registered `https://localhost:44321/signout-oidc` as the **Logout Url** but you haven't created the `signout-oidc` endpoint. This endpoint is actually implemented by ASP.NET Core so there is no need to create it, however, if you want to intercept it you should use `OnRemoteSignOut` event:
+
+```CSharp
+options.Events.OnRemoteSignOut = async context =>
+{
+    //Intercepting the signout-oidc endpoint
+};
 ```
