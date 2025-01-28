@@ -1,7 +1,7 @@
 ﻿/*
  The MIT License (MIT)
 
-Copyright (c) 2018 Microsoft Corporation
+Copyright (c) 2020 Microsoft Corporation
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +29,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using WebApp_OpenIDConnect_DotNet.DAL;
-using WebApp_OpenIDConnect_DotNet.Models;
+using WebApp_MultiTenant_v2.DAL;
+using WebApp_MultiTenant_v2.Models;
 
-namespace WebApp_OpenIDConnect_DotNet.Services
+namespace WebApp_MultiTenant_v2.Services
 {
     public class TodoItemService : ITodoItemService
     {
@@ -114,7 +114,7 @@ namespace WebApp_OpenIDConnect_DotNet.Services
                 await sampleDbContext.SaveChangesAsync();
             }
         }
-        
+
         private bool IsAuthorizedToModify(int itemId, ClaimsPrincipal user)
         {
             var tenantId = user.GetTenantId();

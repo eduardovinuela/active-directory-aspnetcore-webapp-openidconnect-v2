@@ -1,7 +1,7 @@
 ﻿/*
  The MIT License (MIT)
 
-Copyright (c) 2018 Microsoft Corporation
+Copyright (c) 2020 Microsoft Corporation
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,10 +27,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Identity.Web;
 using System.Diagnostics;
 using System.Linq;
-using WebApp_OpenIDConnect_DotNet.DAL;
-using WebApp_OpenIDConnect_DotNet.Models;
+using WebApp_MultiTenant_v2.DAL;
+using WebApp_MultiTenant_v2.Models;
 
-namespace WebApp_OpenIDConnect_DotNet.Controllers
+namespace WebApp_MultiTenant_v2.Controllers
 {
     [AllowAnonymous]
     public class HomeController : Controller
@@ -65,7 +65,7 @@ namespace WebApp_OpenIDConnect_DotNet.Controllers
 
             // If the user deletes its own tenant from the list, they would also be signed-out
             if (id == signedUsersTenant)
-                return RedirectToAction("SignOut", "Account", new { area = "AzureAD" });
+                return RedirectToAction("SignOut", "Account", new { area = "MicrosoftIdentity" });
             else
                 return RedirectToAction("Index");
         }
@@ -80,6 +80,12 @@ namespace WebApp_OpenIDConnect_DotNet.Controllers
             return View();
         }
 
+        public IActionResult Privacy()
+        {
+            return View();
+        }
+
+        [AllowAnonymous]
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {

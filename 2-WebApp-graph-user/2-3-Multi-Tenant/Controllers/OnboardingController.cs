@@ -1,7 +1,7 @@
 ﻿/*
  The MIT License (MIT)
 
-Copyright (c) 2018 Microsoft Corporation
+Copyright (c) 2020 Microsoft Corporation
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,31 +23,32 @@ SOFTWARE.
  */
 
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.AzureAD.UI;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using Microsoft.Identity.Web;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using WebApp_OpenIDConnect_DotNet.DAL;
-using WebApp_OpenIDConnect_DotNet.Models;
+using WebApp_MultiTenant_v2.DAL;
+using WebApp_MultiTenant_v2.Models;
 
-namespace WebApp_OpenIDConnect_DotNet.Controllers
+namespace WebApp_MultiTenant_v2.Controllers
 {
     [AllowAnonymous]
     public class OnboardingController : Controller
     {
         private readonly SampleDbContext dbContext;
-        private readonly AzureADOptions azureADOptions;
+        private readonly MicrosoftIdentityOptions microsoftIdentityOptions;
         private readonly IConfiguration configuration;
 
-        public OnboardingController(SampleDbContext dbContext, IOptions<AzureADOptions> azureADOptions, IConfiguration configuration)
+        public OnboardingController(SampleDbContext dbContext, IOptionsMonitor<MicrosoftIdentityOptions> microsoftIdentityOptions, IConfiguration configuration)
         {
             this.dbContext = dbContext;
-            this.azureADOptions = azureADOptions.Value;
+            this.microsoftIdentityOptions = microsoftIdentityOptions.Get(OpenIdConnectDefaults.AuthenticationScheme);
             this.configuration = configuration;
         }
 
@@ -72,26 +73,28 @@ namespace WebApp_OpenIDConnect_DotNet.Controllers
                 TempAuthorizationCode = stateMarker //Use the stateMarker as a tempCode, so we can locate this entity in the ProcessCode method
             };
 
-            // Saving a temporary tenant to validate the stateMarker on the admin consent response
-            dbContext.AuthorizedTenants.Add(authorizedTenant);
-            dbContext.SaveChanges();
-
             string currentUri = UriHelper.BuildAbsolute(
                 this.Request.Scheme,
                 this.Request.Host,
                 this.Request.PathBase);
 
+
             // Create an OAuth2 request, using the web app as the client. This will trigger a consent flow that will provision the app in the target tenant.
             // Refer to https://docs.microsoft.com/azure/active-directory/develop/v2-admin-consent for details about the Url format being constructed below
             string authorizationRequest = string.Format(
                 "{0}organizations/v2.0/adminconsent?client_id={1}&redirect_uri={2}&state={3}&scope={4}",
-                azureADOptions.Instance,
-                Uri.EscapeDataString(azureADOptions.ClientId),                  // The application Id as obtained from the Azure Portal
+                microsoftIdentityOptions.Instance,
+                Uri.EscapeDataString(microsoftIdentityOptions.ClientId),                  // The application Id as obtained from the Azure Portal
                 Uri.EscapeDataString(currentUri + "Onboarding/ProcessCode"),    // Uri that the admin will be redirected to after the consent
                 Uri.EscapeDataString(stateMarker),                              // The state parameter is used to validate the response, preventing a man-in-the-middle attack, and it will also be used to identify this request in the ProcessCode action.
                 Uri.EscapeDataString(configuration.GetValue<string>("GraphAPI:StaticScope")));  // The scopes to be presented to the admin to consent. Here we are using the static scope '/.default' (https://docs.microsoft.com/azure/active-directory/develop/v2-permissions-and-consent#the-default-scope).
+                                                                                                
+            // Saving a temporary tenant to validate the stateMarker on the admin consent response
+            dbContext.AuthorizedTenants.Add(authorizedTenant);
+            dbContext.SaveChanges();
 
             return Redirect(authorizationRequest);
+
         }
 
         /// <summary>
@@ -104,7 +107,7 @@ namespace WebApp_OpenIDConnect_DotNet.Controllers
         /// <param name="state">A value included in the request that also will be returned in the token response. It can be a string of any content you want. The state is used to encode information about the user's state in the app before the authentication request occurred, such as the page or view they were on..</param>
         /// <remarks>Refer to https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-admin-consent for details on the response</remarks>
         /// <returns></returns>
-        public async Task<IActionResult> ProcessCode(string tenant, string error, string error_description, string admin_consent, string state)
+        public async Task<IActionResult> ProcessCode(string tenant, string error, string error_description, bool admin_consent, string state)
         {
             if (error != null)
             {
@@ -112,7 +115,7 @@ namespace WebApp_OpenIDConnect_DotNet.Controllers
                 return RedirectToAction("Error", "Home");
             }
 
-            if (admin_consent.ToUpper() != "TRUE")
+            if (!admin_consent)
             {
                 TempData["ErrorMessage"] = "The admin consent operation failed.";
                 return RedirectToAction("Error", "Home");
@@ -125,7 +128,7 @@ namespace WebApp_OpenIDConnect_DotNet.Controllers
             {
                 // Create a Sign-in challenge to re-authenticate the user again as we need claims from the user's id_token.
                 // Since the user will have a session on AAD already, they wont need to select an account again.
-                return Challenge(authenticationProperties, AzureADDefaults.OpenIdScheme);
+                return Challenge(authenticationProperties, OpenIdConnectDefaults.AuthenticationScheme);
             }
 
             // Find a tenant record matching the TempAuthorizationCode that we previously saved in the Onboard()
@@ -147,7 +150,7 @@ namespace WebApp_OpenIDConnect_DotNet.Controllers
 
                 // Create a Sign-in challenge to re-authenticate the user again as we need claims from the user's id_token.
                 // Since the user will have a session on AAD already, they wont need to select an account again
-                return Challenge(authenticationProperties, AzureADDefaults.OpenIdScheme);
+                return Challenge(authenticationProperties, OpenIdConnectDefaults.AuthenticationScheme);
             }
         }
     }

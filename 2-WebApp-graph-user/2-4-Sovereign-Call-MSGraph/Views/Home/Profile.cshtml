@@ -1,5 +1,4 @@
-﻿@using Newtonsoft.Json.Linq
-@{
+﻿@{
     ViewData["Title"] = "Profile";
 }
 <h2>@ViewData["Title"]</h2>
@@ -26,15 +25,28 @@
             }
         </td>
     </tr>
-    @{
-        var me = ViewData["me"] as JObject;
-        var children = me.Properties();
-        foreach (var child in children)
+    @{       
+        var me = ViewData["me"] as Microsoft.Graph.Models.User;
+        var properties = me.GetType().GetProperties();
+        foreach (var child in properties)
         {
+            object value = child.GetValue(me);
+            string stringRepresentation;
+            if (!(value is string) && value is IEnumerable<string>)
+            {
+                stringRepresentation = "["
+                    + string.Join(", ", (value as IEnumerable<string>).OfType<object>().Select(c => c.ToString()))
+                    + "]";
+            }
+            else
+            {
+                stringRepresentation = value?.ToString();
+            }
+
             <tr>
-                <td>@child.Name</td>
-                <td>@child.Value</td>
+                <td> @child.Name </td>
+                <td> @stringRepresentation </td>
             </tr>
-        }
+        }      
     }
 </table>

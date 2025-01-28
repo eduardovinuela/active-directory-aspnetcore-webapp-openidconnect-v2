@@ -1,7 +1,7 @@
 ﻿/*
  The MIT License (MIT)
 
-Copyright (c) 2018 Microsoft Corporation
+Copyright (c) 2020 Microsoft Corporation
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,11 +28,11 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Identity.Web;
 using System.Linq;
 using System.Threading.Tasks;
-using WebApp_OpenIDConnect_DotNet.Models;
-using WebApp_OpenIDConnect_DotNet.Services;
-using WebApp_OpenIDConnect_DotNet.Utils;
+using WebApp_MultiTenant_v2.Models;
+using WebApp_MultiTenant_v2.Services;
+using WebApp_MultiTenant_v2.Utils;
 
-namespace WebApp_OpenIDConnect_DotNet.Controllers
+namespace WebApp_MultiTenant_v2.Controllers
 {
     [Authorize]
     public class TodoListController : Controller
@@ -97,7 +97,7 @@ namespace WebApp_OpenIDConnect_DotNet.Controllers
             var userTenant = User.GetTenantId();
 
             // Acquiring token for graph in the signed-in users tenant, so it can be used to retrieve all the users from their tenant
-            var graphAccessToken = await _tokenAcquisition.GetAccessTokenOnBehalfOfUserAsync(new string[] { GraphScope.UserReadAll }, userTenant);
+            var graphAccessToken = await _tokenAcquisition.GetAccessTokenForUserAsync(new string[] { GraphScope.UserReadAll }, tenantId: userTenant);
 
             TempData["UsersDropDown"] = (await _msGraphService.GetUsersAsync(graphAccessToken))
                 .Select(u => new SelectListItem

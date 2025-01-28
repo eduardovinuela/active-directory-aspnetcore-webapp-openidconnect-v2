@@ -1,18 +1,17 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Identity.Web;
+using Microsoft.Identity.Web.UI;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Identity.Web;
-using System.IdentityModel.Tokens.Jwt;
-using WebApp_OpenIDConnect_DotNet.Infrastructure;
-using WebApp_OpenIDConnect_DotNet.Services.GraphOperations;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Identity.Web.TokenCacheProviders.Distributed;
+using System.IdentityModel.Tokens.Jwt;
+using System;
 
-namespace WebApp_OpenIDConnect_DotNet
+namespace _2_1_Call_MSGraph
 {
     public class Startup
     {
@@ -26,12 +25,8 @@ namespace WebApp_OpenIDConnect_DotNet
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.Configure<CookiePolicyOptions>(options =>
-            {
-                // This lambda determines whether user consent for non-essential cookies is needed for a given request.
-                options.CheckConsentNeeded = context => true;
-                options.MinimumSameSitePolicy = SameSiteMode.None;
-            });
+            string[] initialScopes = Configuration.GetValue<string>("DownstreamApi:Scopes")?.Split(' ');
+
 
             // This is required to be instantiated before the OpenIdConnectOptions starts getting configured.
             // By default, the claims mapping will map claim names in the old format to accommodate older SAML applications.
@@ -43,26 +38,40 @@ namespace WebApp_OpenIDConnect_DotNet
             // NOTE : This is a one time use method. We advise using it in development environments to create the tables required to enable token caching.
             // For production deployments, preferably, generate the schema from the tables generated in dev environments and use it to create the necessary tables in production.
             /*
-                dotnet tool install --global dotnet-sql-cache
-                dotnet sql-cache create "Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=MsalTokenCacheDatabase;Integrated Security=True;" dbo TokenCache    
+             *  1. For instance in Visual Studio, open the SQL Server Object explorer, then (localdb)\MSSQLLocalDB, then databases
+             *  2. Right click on Databases and select "Add New database", and then choose the name of the database: 'MY_TOKEN_CACHE_DATABASE'
+             *  3. In the console application run the 2 following commands:
+                     dotnet tool install --global dotnet-sql-cache
+                     dotnet sql-cache create "Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=MY_TOKEN_CACHE_DATABASE;Integrated Security=True;" dbo TokenCache
              */
 
-            // Token acquisition service based on MSAL.NET
-            // and chosen token cache implementation
-            services.AddMicrosoftIdentityPlatformAuthentication(Configuration)
-                    .AddMsal(Configuration, new string[] { Constants.ScopeUserRead })
-                    .AddDistributedTokenCaches();
+            services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+                .AddMicrosoftIdentityWebApp(Configuration.GetSection("AzureAd"))
+                    .EnableTokenAcquisitionToCallDownstreamApi(initialScopes)
+                        .AddMicrosoftGraph(Configuration.GetSection("DownstreamApi"))
+                        .AddDistributedTokenCaches();
 
             services.AddDistributedSqlServerCache(options =>
             {
                 options.ConnectionString = Configuration.GetConnectionString("TokenCacheDbConnStr");
                 options.SchemaName = "dbo";
                 options.TableName = "TokenCache";
+
+                // You don't want the SQL token cache to be purged before the access token has expired. Usually
+                // access tokens expire after 1 hour (but this can be changed by token lifetime policies), whereas
+
+                // the default sliding expiration for the distributed SQL database is 20 mins. 
+                // Use a value which is above 60 mins (or the lifetime of a token in case of longer lived tokens)
+                options.DefaultSlidingExpiration = TimeSpan.FromMinutes(90);
             });
 
+            // Uncomment for Redis configuration. Be sure you DO NOT ADD BOTH an SQL cache and Redis cache
+            //services.AddStackExchangeRedisCache(options =>
+            //{
+            //    options.Configuration = Configuration.GetConnectionString("TokenCacheRedisConnStr");
+            //    options.InstanceName = Configuration.GetConnectionString("TokenCacheRedisInstanceName");
+            //});
 
-            // Add Graph
-            services.AddGraphService(Configuration);
 
             services.AddControllersWithViews(options =>
             {
@@ -71,7 +80,9 @@ namespace WebApp_OpenIDConnect_DotNet
                     .Build();
                 options.Filters.Add(new AuthorizeFilter(policy));
             });
-            services.AddRazorPages();
+
+            services.AddRazorPages()
+                .AddMicrosoftIdentityUI();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -87,12 +98,11 @@ namespace WebApp_OpenIDConnect_DotNet
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
-
             app.UseHttpsRedirection();
             app.UseStaticFiles();
-            app.UseCookiePolicy();
 
             app.UseRouting();
+
             app.UseAuthentication();
             app.UseAuthorization();
 

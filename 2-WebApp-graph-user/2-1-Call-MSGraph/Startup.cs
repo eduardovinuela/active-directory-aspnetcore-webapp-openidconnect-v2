@@ -1,18 +1,19 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Azure;
+using Azure.Identity;
+using Azure.Security.KeyVault.Secrets;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Identity.Web;
-using Microsoft.Identity.Web.TokenCacheProviders.Distributed;
-using Microsoft.Identity.Web.TokenCacheProviders.InMemory;
-using WebApp_OpenIDConnect_DotNet.Infrastructure;
-using WebApp_OpenIDConnect_DotNet.Services;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Identity.Web;
+using Microsoft.Identity.Web.UI;
+using System;
 
-namespace WebApp_OpenIDConnect_DotNet
+namespace WebApp_OpenIDConnect_DotNet_graph
 {
     public class Startup
     {
@@ -26,49 +27,18 @@ namespace WebApp_OpenIDConnect_DotNet
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.Configure<CookiePolicyOptions>(options =>
-            {
-                // This lambda determines whether user consent for non-essential cookies is needed for a given request.
-                options.CheckConsentNeeded = context => true;
-                options.MinimumSameSitePolicy = SameSiteMode.None;
-            });
+            string[] initialScopes = Configuration.GetValue<string>("DownstreamApi:Scopes")?.Split(' ');
 
-            services.AddOptions();
+            services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+                .AddMicrosoftIdentityWebApp(Configuration)
+                .EnableTokenAcquisitionToCallDownstreamApi(initialScopes)
+                .AddMicrosoftGraph(Configuration.GetSection("DownstreamApi"))
+                .AddInMemoryTokenCaches();
 
-            // Token acquisition service based on MSAL.NET
-            // and chosen token cache implementation
-            services.AddMicrosoftIdentityPlatformAuthentication(Configuration)
-               .AddMsal(Configuration, new string[] { Constants.ScopeUserRead })
-               .AddInMemoryTokenCaches();
-
-            /*
-               // or use a distributed Token Cache by adding 
-                           .AddDistributedTokenCaches();
-
-               // and then choose your implementation. 
-               // See https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed?view=aspnetcore-2.2#distributed-memory-cache
-
-               // For instance the distributed in memory cache
-                services.AddDistributedMemoryCache()
-
-               // Or a Redis cache
-               services.AddStackExchangeRedisCache(options =>
-                    {
-                        options.Configuration = "localhost";
-                        options.InstanceName = "SampleInstance";
-                    });
-
-               // Or even a SQL Server token cache
-               services.AddDistributedSqlServerCache(options =>
-                {
-                    options.ConnectionString = 
-                        _config["DistCache_ConnectionString"];
-                    options.SchemaName = "dbo";
-                    options.TableName = "TestCache";
-                });
-            */
-            // Add Graph
-            services.AddGraphService(Configuration);
+            // uncomment the following 3 lines to get ClientSecret from KeyVault
+            //string tenantId = Configuration.GetValue<string>("AzureAd:TenantId");
+            //services.Configure<MicrosoftIdentityOptions>(
+            //   options => { options.ClientSecret = GetSecretFromKeyVault(tenantId, "ENTER_YOUR_SECRET_NAME_HERE"); });
 
             services.AddControllersWithViews(options =>
             {
@@ -78,7 +48,12 @@ namespace WebApp_OpenIDConnect_DotNet
                 options.Filters.Add(new AuthorizeFilter(policy));
             });
 
-            services.AddRazorPages();
+            services.AddRazorPages()
+                  .AddMicrosoftIdentityUI();
+
+            // Add the UI support to handle claims challenges
+            services.AddServerSideBlazor()
+               .AddMicrosoftIdentityConsentHandler();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -94,22 +69,42 @@ namespace WebApp_OpenIDConnect_DotNet
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
-
             app.UseHttpsRedirection();
             app.UseStaticFiles();
-            app.UseCookiePolicy();
 
             app.UseRouting();
+
             app.UseAuthentication();
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
             {
-            endpoints.MapControllerRoute(
-                name: "default",
-                pattern: "{controller=Home}/{action=Index}/{id?}");
-            endpoints.MapRazorPages();
-        });
+                endpoints.MapControllerRoute(
+                    name: "default",
+                    pattern: "{controller=Home}/{action=Index}/{id?}");
+                endpoints.MapRazorPages();
+            });
+        }
+
+        /// Gets the secret from key vault via an enabled Managed Identity.
+        /// </summary>
+        /// <remarks>https://github.com/Azure-Samples/app-service-msi-keyvault-dotnet/blob/master/README.md</remarks>
+        /// <returns></returns>
+        private string GetSecretFromKeyVault(string tenantId, string secretName)
+        {
+            // this should point to your vault's URI, like https://<yourkeyvault>.vault.azure.net/
+            string uri = Environment.GetEnvironmentVariable("KEY_VAULT_URI");
+            DefaultAzureCredentialOptions options = new DefaultAzureCredentialOptions();
+
+            // Specify the tenant ID to use the dev credentials when running the app locally
+            options.VisualStudioTenantId = tenantId;
+            options.SharedTokenCacheTenantId = tenantId;
+            SecretClient client = new SecretClient(new Uri(uri), new DefaultAzureCredential(options));
+
+            // The secret name, for example if the full url to the secret is https://<yourkeyvault>.vault.azure.net/secrets/ENTER_YOUR_SECRET_NAME_HERE
+            Response<KeyVaultSecret> secret = client.GetSecretAsync(secretName).Result;
+
+            return secret.Value.Value;
         }
     }
 }
